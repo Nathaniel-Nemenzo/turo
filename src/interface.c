@@ -26,7 +26,7 @@ static void print_init_msg(void) {
 static void print_final_msg(void) {
     time_t t;
     assert(time(&t) != -1);
-    fprintf(outfile, "Compilation ended at: %s\n", ctime(&t));
+    fprintf(outfile, "\nCompilation ended at: %s\n", ctime(&t));
 }
 
 void init_interface(void) {

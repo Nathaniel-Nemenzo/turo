@@ -45,7 +45,7 @@ static char* format_log_message(log_lev_t sev, char *msg) {
     return printbuf;
 }
 
-extern int logmsg(log_lev_t level, char * msg) {
+extern int logmsg(log_lev_t level, char *msg) {
     switch (level) {
         case LOG_ERROR:
             if (ignore_input) return 0;

@@ -7,6 +7,9 @@
  * May not be used, modified, or copied without permission.
  **************************************************************************/ 
 
+#ifndef TOKEN_H
+#define TOKEN_H
+
 /* Sets an upper bound for the max representation length of a token (ids can't be more than 100) */
 #define MAX_LEXEME_LENGTH 100
 
@@ -54,6 +57,7 @@ typedef enum {
     TOK_SEMICOL,
     TOK_COMMENT,
     /* ----- other ----- */
+    TOK_IDENTITY, // 'nothing' type
     TOK_EOF,
     TOK_INVALID = -1,
 } token_type_t;
@@ -61,5 +65,7 @@ typedef enum {
 /* Struct for tokens found in input string */
 typedef struct token {
     token_type_t ttype;
-    char lexeme[MAX_LEXEME_LENGTH];
+    char *lexeme;
 } token_t, *tptr_t;
+
+#endif // TOKEN_H

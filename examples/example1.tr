@@ -1,0 +1,16 @@
+// This is the main procedure for a Turo program.
+// Whitespace matters in Turo. Scope is based on indenting.
+
+function int main()
+    def int a = 1;
+    decl int b;
+    b = 2;
+
+    if (a == 1)
+        int a = 2;
+        while (a != 100)
+            a = a + 1;
+        print(a);
+
+    print(a);
+    print(b);

@@ -8,6 +8,9 @@
  * May not be used, modified, or copied without permission.
  **************************************************************************/ 
 
+#ifndef TURO_H
+#define TURO_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -18,6 +21,7 @@
 #include <time.h>
 #include "err_handler.h"
 #include "lex.h"
+#include "symboltable.h"
 
 /* handle_args() - function to handle command-line arguments given to the program
  *
@@ -33,6 +37,11 @@ extern void init_interface(void);
  * Side effects: 
  */
 extern void finalize(void);
+
+/* test() - unit tests
+ * Parameters: parts of program to test
+ */
+extern void test(symbol_table_t *);
 
 /* Program variables */
 
@@ -50,3 +59,5 @@ extern FILE *errfile;
  * terminate - ends the program
  */
 extern bool ignore_input, terminate;
+
+#endif // TURO_H

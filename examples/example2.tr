@@ -1,0 +1,18 @@
+/* Demonstrates // comments and tabbing w/ spaces instead of '\t' */
+
+/* Another comment for "testing */"*/
+
+hello
+
+/* More comments for 
+ *
+ *
+ * testing
+ */
+
+def hello= 1;
+if (hello==1)
+  hello = 2; // tabbed using space
+  if (hello == 2)
+    hello = 3;
+print(hello)

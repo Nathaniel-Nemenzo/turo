@@ -8,6 +8,9 @@
  * May not be used, modified, or copied without permission.
  **************************************************************************/ 
 
+#ifndef ERR_HANDLER_H
+#define ERR_HANDLER_H
+
 typedef enum {
     LOG_INFO,       // print message to console
     LOG_WARNING,    // print warning message and ignore input
@@ -37,4 +40,6 @@ extern int logmsg(log_lev_t, char *);
  * Return: return based on printing status
  */
 extern int handle_error(err_type_t);
+
+#endif // ERR_HANDLER_H
 

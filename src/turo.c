@@ -12,7 +12,7 @@
 int main(int argc, char *argv[]) {
     handle_args(argc, argv);
     init_interface();
-    init_lexer();
+    //init_lexer();
     finalize();
     return EXIT_SUCCESS;
 }
