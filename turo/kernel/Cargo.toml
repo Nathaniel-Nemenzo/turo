@@ -13,6 +13,7 @@ spin = "0.5.2"
 x86_64 = "0.14.2"
 x86 = "0.52.0"
 log = "0.4.20"
+uart_16550 = "0.3.0"
 
 # Kernel
 [dependencies.lazy_static]
