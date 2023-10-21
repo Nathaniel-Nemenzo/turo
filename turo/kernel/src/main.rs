@@ -35,6 +35,7 @@ unsafe extern "C" fn _start() -> ! {
             }
         }
     }
+    arch::arch_main();
     hcf();
 }
 
