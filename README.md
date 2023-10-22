@@ -85,13 +85,7 @@
 
 [![Product Name Screen Shot][product-screenshot]](https://example.com)
 
-Turo is an hobby operating system that runs on the x86-64 architecture. It is developed in Rust. <i>Turo</i> is a word root in <a href="https://en.wikipedia.org/wiki/Tagalog_language">Tagalog</a> meaning 'related to teaching.' The Turo operating system is meant to teach me (and anyone who happens upon this respository) how to write an operating system in Rust. Consequently, Turo has as little dependencies as possible. 
-
-What this means is that the only 'dependency' we will be using is GRUB, our bootloader. For the interest of time (and my sanity), I will be relying on GRUB to boot my kernel. Everything after that point is up to me.
-
-Like most modern operating systems, Turo will fall in between a `pure monolithic` and a `pure micro-kernel` operating systems. This means that some services will fall into kernel space and some services will fall into user space, not all in the former and not all in the latter. In addition, Turo will run on a multi-core CPU from the beginning. 
-
-In terms of coding and cleanliness, Turo's source code will be well documented, so that running `cargo doc` will give a pretty good overview of the operating system. In addition, Turo will strive to be well tested, using both unit and integration tests.
+Turo is an hobby operating system that runs on the x86-64 architecture. It is developed in Rust. <i>Turo</i> is a word root in <a href="https://en.wikipedia.org/wiki/Tagalog_language">Tagalog</a> meaning 'related to teaching.' The Turo operating system is meant to teach me (and anyone who happens upon this respository) how to write an operating system in Rust.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
