@@ -2,10 +2,7 @@
 #![no_main]
 
 #[macro_use]
-pub mod serial;
 pub mod arch;
-pub mod logging;
-pub mod vga_buffer;
 
 use core::arch::asm;
 
