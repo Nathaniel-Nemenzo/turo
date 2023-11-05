@@ -50,17 +50,6 @@ impl SerialPort {
         io::outb(self.0 + 3, 0x03);    // 8 bits, no parity, one stop bit
         io::outb(self.0 + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
         io::outb(self.0 + 4, 0x0B);    // IRQs enabled, RTS/DSR set
-        io::outb(self.0 + 4, 0x1E);    // Set in loopback mode, test the serial chip
-        io::outb(self.0 + 0, 0xAE);    // Test serial chip (send byte 0xAE and check if serial returns same byte)
-
-        // Check if serial is faulty (not same byte as sent)
-        if io::inb(self.0 + 0) != 0xAE {
-            panic!();
-        }
-
-        // If serial is not faulty set it in normal operation mode 
-        // (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
-        io::outb(self.0 + 4, 0x0F);
 
         // Enable interrupts
         io::outb(self.0 + 1, 0x01);
@@ -69,11 +58,11 @@ impl SerialPort {
     }
 
     unsafe fn is_transmit_empty(&self) -> bool {
-        return (io::inb(self.0) & 0x20) == 0
+        return (io::inb(self.0 + 5) & 0x20) == 0
     }
 
     unsafe fn wait_for_transmit_empty(&self) {
-        while !self.is_transmit_empty() {
+        while self.is_transmit_empty() {
             core::hint::spin_loop();
         }
     }
@@ -117,9 +106,16 @@ impl fmt::Write for SerialPort {
 pub fn _print(args: ::core::fmt::Arguments) {
     use core::fmt::Write;
 
-    // TODO: perform this without interrupts
     if let Some(com) = COM_1.get() {
-        com.lock().write_fmt(args).expect("Printing to serial failed.");
+        unsafe {
+            // disable interrupts
+            asm!("cli");
+
+            com.lock().write_fmt(args).expect("Printing to serial failed.");
+
+            // enable interrupts
+            asm!("sti");
+        }
     };
 }
 
@@ -132,8 +128,8 @@ macro_rules! serial_print {
 
 #[macro_export]
 macro_rules! serial_println {
-    () => ($crate::drivers::uart_16550::serial_print!("\n"));
-    ($fmt:expr) => ($crate::drivers::uart_16550::serial_print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::drivers::uart_16550::serial_print!(
+    () => ($crate::serial_print!("\n"));
+    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
         concat!($fmt, "\n"), $($arg)*));
 }

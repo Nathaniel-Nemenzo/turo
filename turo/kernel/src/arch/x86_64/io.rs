@@ -1,5 +1,4 @@
 
-
 ///
 /// outb(port: u16, value: u8)
 /// 

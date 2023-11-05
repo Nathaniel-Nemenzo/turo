@@ -6,8 +6,8 @@
 #![no_std]
 #![no_main]
 
-#[macro_use]
 pub mod arch;
+pub mod util;
 pub mod drivers;
 
 mod prelude {
