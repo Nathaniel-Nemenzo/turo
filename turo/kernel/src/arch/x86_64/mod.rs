@@ -1,15 +1,15 @@
 
 pub mod io;
+pub mod gdt;
 
 /// Architecture-specific initialization function
 /// 
 /// Initializes the kernel on the x86_64 architecture 
 pub fn arch_main() {
     unsafe {
-        asm!("cli");
-        crate::drivers::uart_16550::init();
-        crate::util::logger::init();
-        log::trace!("logging works!");
-        asm!("sti");
+        x86_64::instructions::interrupts::disable();
+            crate::drivers::uart_16550::init();
+            crate::util::logger::init();
+        x86_64::instructions::interrupts::enable();
     }
 }
