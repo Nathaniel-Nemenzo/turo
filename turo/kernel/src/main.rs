@@ -1,10 +1,24 @@
+#![feature(
+    prelude_import,
+)]
+
+#![allow(internal_features)]
 #![no_std]
 #![no_main]
 
 #[macro_use]
 pub mod arch;
+pub mod drivers;
 
-use core::arch::asm;
+mod prelude {
+    pub mod rust_2021 {
+        pub use core::arch::asm;
+        pub use core::prelude::rust_2021::*;
+    }
+}
+
+#[prelude_import]
+pub use prelude::rust_2021::*;
 
 static FRAMEBUFFER_REQUEST: limine::FramebufferRequest = limine::FramebufferRequest::new(0);
 

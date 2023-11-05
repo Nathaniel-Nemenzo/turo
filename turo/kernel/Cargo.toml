@@ -7,6 +7,11 @@ edition = "2021"
 
 # Bootloader
 [dependencies]
+spin = { version = "0.9.8", default-features = false, features = [
+    "spin_mutex",
+    "rwlock",
+    "once",
+] }
 limine = "0.1.11"
 log = "0.4.20"
 
