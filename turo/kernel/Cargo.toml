@@ -5,7 +5,6 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-# Bootloader
 [dependencies]
 spin = { version = "0.9.8", default-features = false, features = [
     "spin_mutex",
@@ -14,12 +13,13 @@ spin = { version = "0.9.8", default-features = false, features = [
 ] }
 limine = "0.1.11"
 log = "0.4.20"
+bitflags = "2.4.1"
+uart_16550 = "0.3.0"
 
 [dependencies.x86_64]
 version = "0.14.11"
 features = ["instructions"]
 
-# Kernel
 [dependencies.lazy_static]
 version = "1.0"
 features = ["spin_no_std"]

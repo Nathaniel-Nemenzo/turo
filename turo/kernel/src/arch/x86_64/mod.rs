@@ -1,6 +1,7 @@
 
 pub mod io;
-pub mod gdt;
+// pub mod gdt;
+pub mod serial;
 
 /// Architecture-specific initialization function
 /// 
@@ -8,8 +9,8 @@ pub mod gdt;
 pub fn arch_main() {
     unsafe {
         x86_64::instructions::interrupts::disable();
-            crate::drivers::uart_16550::init();
             crate::util::logger::init();
+            log::trace!("printing to host");
         x86_64::instructions::interrupts::enable();
     }
 }

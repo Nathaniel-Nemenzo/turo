@@ -1,7 +1,9 @@
 #![feature(
     prelude_import,
+    custom_test_frameworks,
 )]
 
+#![test_runner(crate::testing::test_runner)]
 #![allow(internal_features)]
 #![no_std]
 #![no_main]
@@ -9,6 +11,7 @@
 pub mod arch;
 pub mod util;
 pub mod drivers;
+mod testing;
 
 mod prelude {
     pub mod rust_2021 {
