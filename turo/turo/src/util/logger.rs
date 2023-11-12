@@ -18,7 +18,7 @@ use crate::{serial_println, serial_print};
 struct TuroLogger;
 
 impl log::Log for TuroLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 

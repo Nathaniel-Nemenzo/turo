@@ -25,10 +25,6 @@ $(eval $(call DEFAULT_VAR,HOST_LDFLAGS,$(DEFAULT_HOST_LDFLAGS)))
 override DEFAULT_HOST_LIBS :=
 $(eval $(call DEFAULT_VAR,HOST_LIBS,$(DEFAULT_HOST_LIBS)))
 
-.PHONE: test
-test: 
-	$(MAKE) -C turo test
-
 .PHONY: all
 all: $(IMAGE_NAME).iso
 
@@ -50,6 +46,10 @@ run-hdd: $(IMAGE_NAME).hdd
 .PHONY: run-hdd-uefi
 run-hdd-uefi: ovmf $(IMAGE_NAME).hdd
 	qemu-system-x86_64 -serial stdio -M q35 -m 8G -smp 4 -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd
+
+.PHONY: test
+test: limine
+	$(MAKE) -C turo test
 
 ovmf:
 	mkdir -p ovmf

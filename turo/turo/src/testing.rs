@@ -17,10 +17,10 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
     }
 }
 
-pub fn test_runner(tests: &[&dyn Testable]) {
+pub(crate) fn test_runner(tests: &[&dyn Testable]) {
     serial_println!("Running {} tests", tests.len());
     for test in tests {
-        test.run(); // new
+        test.run();
     }
     exit_qemu(QemuExitCode::Success);
 }
