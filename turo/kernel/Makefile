@@ -10,7 +10,7 @@ ifeq ($(RUST_PROFILE),dev)
     override RUST_PROFILE_SUBDIR := debug
 endif
 
-# Default target.
+# Default target
 .PHONY: all
 all:
 	cargo build --target x86_64-unknown-none --profile $(RUST_PROFILE)

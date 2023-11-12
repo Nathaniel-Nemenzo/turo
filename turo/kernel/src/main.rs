@@ -3,7 +3,10 @@
     custom_test_frameworks,
 )]
 
+// Testing
 #![test_runner(crate::testing::test_runner)]
+#![reexport_test_harness_main = "test_main"]
+
 #![allow(internal_features)]
 #![no_std]
 #![no_main]
@@ -50,19 +53,28 @@ unsafe extern "C" fn _start() -> ! {
         }
     }
     arch::arch_main();
+
+    #[cfg(test)]
+    test_main();
+
+    x86_64::instructions::interrupts::enable();
     hcf();
 }
 
+#[cfg(not(test))]
 #[panic_handler]
-fn rust_panic(_info: &core::panic::PanicInfo) -> ! {
+fn rust_panic(info: &core::panic::PanicInfo) -> ! {
+    serial_println!("{}", info);
     hcf();
 }
 
 fn hcf() -> ! {
-    unsafe {
-        asm!("cli");
-        loop {
-            asm!("hlt");
-        }
+    loop {
+        x86_64::instructions::interrupts::enable_and_hlt();
     }
+}
+
+#[test_case]
+fn trivial_assertion() {
+    assert_eq!(1, 1);
 }
