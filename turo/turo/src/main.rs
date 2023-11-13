@@ -4,27 +4,14 @@
 )]
 
 // Testing
-#![test_runner(crate::testing::test_runner)]
+#![test_runner(turo::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 #![allow(internal_features)]
 #![no_std]
 #![no_main]
 
-pub mod arch;
-pub mod util;
-pub mod drivers;
-mod testing;
-
-mod prelude {
-    pub mod rust_2021 {
-        pub use core::arch::asm;
-        pub use core::prelude::rust_2021::*;
-    }
-}
-
-#[prelude_import]
-pub use prelude::rust_2021::*;
+use turo::{serial_print, serial_println};
 
 static FRAMEBUFFER_REQUEST: limine::FramebufferRequest = limine::FramebufferRequest::new(0);
 
@@ -52,19 +39,12 @@ unsafe extern "C" fn _start() -> ! {
             }
         }
     }
-    arch::arch_main();
+
+    turo::init();
 
     #[cfg(test)]
     test_main();
 
-    x86_64::instructions::interrupts::enable();
-    hcf();
-}
-
-#[cfg(not(test))]
-#[panic_handler]
-fn rust_panic(info: &core::panic::PanicInfo) -> ! {
-    serial_println!("{}", info);
     hcf();
 }
 
@@ -72,6 +52,19 @@ fn hcf() -> ! {
     loop {
         x86_64::instructions::interrupts::enable_and_hlt();
     }
+}
+
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    serial_println!("{}", info);
+    hcf();
+}
+
+#[cfg(test)]
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    turo::test_panic_handler(info);
 }
 
 #[test_case]
