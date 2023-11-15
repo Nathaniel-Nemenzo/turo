@@ -26,7 +26,8 @@ rm -rf iso_root
 
 # After we link the kernel with the `limine` bootloader, we need to run the tests on qemu
 # Adding timeout command with a specified duration (e.g., 30 seconds)
-timeout --foreground 30 qemu-system-x86_64 -serial stdio -M q35 -m 8G -smp 4 -cdrom "$IMAGE_NAME".iso -boot d -device isa-debug-exit,iobase=0xf4,iosize=0x04 -display none
+# TODO: make platform-compatible (`timeout` not available on all platforms)
+qemu-system-x86_64 -serial stdio -M q35 -m 8G -smp 4 -cdrom "$IMAGE_NAME".iso -boot d -device isa-debug-exit,iobase=0xf4,iosize=0x04 -display none
 
 # Then, we must get the exit code of `qemu` and map it to a 0 | 1 for `cargo test`
 exit_code=$?

@@ -1,35 +1,133 @@
 use bitflags::bitflags;
+use core::mem::size_of;
 
 use super::tss::TaskStateSegment;
 
 pub fn init() {}
 
+///
+/// The GDTDescriptor struct is passed into the `lgdt` assembly instruction.
+/// 
+/// It contains the size of the GDT and the offset of the GDT that it describes.
+#[repr(C, packed)]
+#[derive(Debug, Clone)]
+pub struct GDTDescriptor {
+    /// The size of the GDT is the actual size - 1, because the maximum value of a 16-bit number is 65536, but the max
+    /// size of a GDT can be 65536 bytes.
+    size: u16,
+
+    /// The linear address of a GDT.
+    offset: u64,
+}
+
+impl GDTDescriptor {
+    pub fn new(table: GlobalDescriptorTable) -> Self {
+        Self {
+            size: table.size - 1,
+
+            // Gets the address of the table as a u64
+            offset: &table.table as *const _ as u64,
+        }
+    }
+}
+
+///
+/// The global descriptor table is a binary data structure specific to the IA32 and x86-64 architectures.
+/// It contains entries telling the CPU about memory segments, which is an old memory management scheme used
+/// in older architectures, like x86.
+/// 
+/// In x86-64, the global descriptor table is used mainly for system segment functionality, like the TSS descriptor;
+/// it is not used for segmentation, as we use paging instead. This means that the `base` and `limit` values are never
+/// used and can span the whole linear address space. 
 #[derive(Debug, Clone)]
 pub struct GlobalDescriptorTable {
+    /// Represents the actual GDT
+    /// 
+    /// For now, there's a fixed limit of 8 entries (there are a maximum of 65536 / 8 == 8192 entries, but
+    /// this wastes space if we initialize statically and we don't really need that much for now).
     table: [u64; 8],
-    len:   u64,    
+
+    /// The size of the GDT in bytes
+    size:   u16,
 }
 
 impl GlobalDescriptorTable {
+    /// 
+    /// new()
+    /// 
     /// Creates a new, empty GDT
     /// 
-    /// Provides some default functionality (**subject to change as the kernel
-    /// evolves**):
-    /// - Entry 0 is the null descriptor
-    /// - Entry 1 is the kernel mode code segment
-    /// - Entry 2 is the kernel mode data segment
-    /// - Entry 3 is the user mode code segment
-    /// - Entry 4 is the user mode data segment
-    /// - Entry 5 is the task state segment (64-bit system segment)
-    pub fn new() {
-
+    /// Adds a null descriptor (0) as the first entry in the GDT.
+    pub fn new() -> Self {
+        Self {
+            table: [0; 8],
+            size: 8,
+        }
     }
 
-    pub fn add_entry() {
+    ///
+    /// add_default_descriptor(&mut self, DefaultSegmentDescriptor)
+    /// 
+    /// Adds a default descriptor to the GDT. Default descriptors take the space of one entry in the GDT
+    /// 
+    /// Panics if the number of entries succeeds the limit defines in the struct
+    pub fn add_default_descriptor(&mut self, descriptor: DefaultSegmentDescriptor) {
+        if usize::from(self.size) == self.table.len() * size_of::<u64>() {
+            panic!("No more space left in the table")
+        }
 
+        // Figure out where to add the descriptor
+        let idx = usize::from(self.size) / size_of::<u64>();
+
+        // Add the descriptor in
+        self.table[idx] = descriptor.0;
+
+        // Add to the size
+        self.size += size_of::<u64>() as u16;
     }
 
-    pub fn load() {}
+    ///
+    /// add_system_descriptor(&mut self, SystemSegmentDescriptor)
+    /// 
+    /// Adds a system descriptor to the GDT. System descriptors take the space of two entries in the GDT
+    /// 
+    /// The lower half of the system descriptor precedes the higher half in the table
+    pub fn add_system_descriptor(&mut self, descriptor: SystemSegmentDescriptor) {
+        // This logic is a little different because you need two entry spaces to add a system descriptor
+        if usize::from(self.size) >= (self.table.len() - 1) * size_of::<u64>() {
+            panic!("No more space left in the table")
+        }
+
+        // Figure out where to add the descriptor
+        let idx = usize::from(self.size) / size_of::<u64>();
+
+        // Add the descriptor
+        self.table[idx] = descriptor.0;
+        self.table[idx + 1] = descriptor.1;
+
+        self.size += size_of::<u64>() as u16 * 2;
+    }
+
+    ///
+    /// load(&self, &GDTDescriptor)
+    /// 
+    /// Loads the GDT pointer to by the GDTDescriptor
+    /// 
+    /// Wraps the load_unsafe() function in this struct
+    pub fn load(&self, gdtr: &GDTDescriptor) {
+        unsafe { self.load_unsafe(gdtr) }
+    }
+
+    ///
+    /// load_unsafe(&self, &GDTDescriptor)
+    /// 
+    /// Loads the GDT pointed to by the GDTDescriptor
+    /// 
+    /// This function is unsafe because you must make sure that the underlying GDT pointed to by the GDTR is valid
+    /// and you must make sure that the GDTR itself is valid.
+    unsafe fn load_unsafe(&self, gdtr: &GDTDescriptor) {
+
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -119,11 +217,8 @@ bitflags! {
 /// A segment descriptor is an entry in the GDT. There are two types of segment descriptors.
 /// One type is the `default` type (user/code segments) and the other is the `system` type,
 /// which is mainly for the TSS in this case.
-#[repr(transparent)]
 #[derive(Debug, Clone)]
-pub struct DefaultSegmentDescriptor {
-    value:  u64,
-}
+pub struct DefaultSegmentDescriptor(u64);
 
 impl DefaultSegmentDescriptor {
 
@@ -132,9 +227,7 @@ impl DefaultSegmentDescriptor {
     /// 
     /// Creates a null DefaultSegmentDescriptor
     pub fn null() -> Self {
-        Self {
-            value: 0
-        }
+        Self(0)
     }
 
     ///
@@ -144,11 +237,11 @@ impl DefaultSegmentDescriptor {
     pub fn kernel_data() -> Self {
         use DefaultSegmentDescriptorFlags as Flags;
         
-        let mut ret = Self { value: 0 };
+        let mut ret = Self(0);
 
         // First, let's set the limit.
-        ret.value |= 0xFFFF;
-        ret.value |= 0xF << 48;
+        ret.0 |= 0xFFFF;
+        ret.0 |= 0xF << 48;
 
         // Secondly, let's set the access byte (10010010 or 0x92)
         let access = Flags::from_bits_truncate(
@@ -156,14 +249,14 @@ impl DefaultSegmentDescriptor {
             | Flags::CODE_DATA_SEGMENT.bits()
             | Flags::READABLE_WRITABLE.bits()
         );
-        ret.value |= access.bits();
+        ret.0 |= access.bits();
 
         // Finally, let's set the flags (1100 or 0xC)
         let flags = Flags::from_bits_truncate(
             Flags::PAGE_BLOCKS.bits()
             | Flags::PROTECTED_MODE_32.bits()
         );
-        ret.value |= flags.bits();
+        ret.0 |= flags.bits();
 
         ret
     }
@@ -175,11 +268,11 @@ impl DefaultSegmentDescriptor {
     pub fn kernel_code() -> Self {
         use DefaultSegmentDescriptorFlags as Flags;
         
-        let mut ret = Self { value: 0 };
+        let mut ret = Self(0);
 
         // First, let's set the limit.
-        ret.value |= 0xFFFF;
-        ret.value |= 0xF << 48;
+        ret.0 |= 0xFFFF;
+        ret.0 |= 0xF << 48;
 
         // Secondly, let's set the access byte (10011010 or 0x9A)
         let access = Flags::from_bits_truncate(
@@ -188,14 +281,14 @@ impl DefaultSegmentDescriptor {
             | Flags::EXECUTABLE.bits()
             | Flags::READABLE_WRITABLE.bits()
         );
-        ret.value |= access.bits();
+        ret.0 |= access.bits();
 
         // Finally, let's set the flags (1010 or 0xA)
         let flags = Flags::from_bits_truncate(
             Flags::PAGE_BLOCKS.bits()
             | Flags::LONG_MODE.bits()
         );
-        ret.value |= flags.bits();
+        ret.0 |= flags.bits();
 
         ret
     }
@@ -207,11 +300,11 @@ impl DefaultSegmentDescriptor {
     pub fn user_data() -> Self {
         use DefaultSegmentDescriptorFlags as Flags;
         
-        let mut ret = Self { value: 0 };
+        let mut ret = Self(0);
 
         // First, let's set the limit.
-        ret.value |= 0xFFFF;
-        ret.value |= 0xF << 48;
+        ret.0 |= 0xFFFF;
+        ret.0 |= 0xF << 48;
 
         // Secondly, let's set the access byte (11110010 or 0xF2)
         let access = Flags::from_bits_truncate(
@@ -220,14 +313,14 @@ impl DefaultSegmentDescriptor {
             | Flags::CODE_DATA_SEGMENT.bits()
             | Flags::READABLE_WRITABLE.bits()
         );
-        ret.value |= access.bits();
+        ret.0 |= access.bits();
 
         // Finally, let's set the flags (1100 or 0xC)
         let flags = Flags::from_bits_truncate(
             Flags::PAGE_BLOCKS.bits()
             | Flags::PROTECTED_MODE_32.bits()
         );
-        ret.value |= flags.bits();
+        ret.0 |= flags.bits();
 
         ret
     }
@@ -239,11 +332,11 @@ impl DefaultSegmentDescriptor {
     pub fn user_code() -> Self {
         use DefaultSegmentDescriptorFlags as Flags;
         
-        let mut ret = Self { value: 0 };
+        let mut ret = Self(0);
 
         // First, let's set the limit.
-        ret.value |= 0xFFFF;
-        ret.value |= 0xF << 48;
+        ret.0 |= 0xFFFF;
+        ret.0 |= 0xF << 48;
 
         // Secondly, let's set the access byte (11111010 or 0xFA)
         let access = Flags::from_bits_truncate(
@@ -253,14 +346,14 @@ impl DefaultSegmentDescriptor {
             | Flags::EXECUTABLE.bits()
             | Flags::READABLE_WRITABLE.bits()
         );
-        ret.value |= access.bits();
+        ret.0 |= access.bits();
 
         // Finally, let's set the flags (1010 or 0xA)
         let flags = Flags::from_bits_truncate(
             Flags::PAGE_BLOCKS.bits()
             | Flags::LONG_MODE.bits()
         );
-        ret.value |= flags.bits();
+        ret.0 |= flags.bits();
 
         ret
     }
@@ -271,11 +364,11 @@ impl DefaultSegmentDescriptor {
 /// which is used to ensure that the base value can contain a 64-bit linear address.
 /// 
 /// The system segment is mainly used for the TSS.
-#[repr(transparent)]
+/// 
+/// This is a (u64, u64) because the GDT only holds u64-sized entries. Makes the logic a bit
+/// easier than having a (u128).
 #[derive(Debug, Clone)]
-pub struct SystemSegmentDescriptor {
-    value:  u128,
-}
+pub struct SystemSegmentDescriptor(u64, u64);
 
 impl SystemSegmentDescriptor {
     ///
@@ -285,4 +378,34 @@ impl SystemSegmentDescriptor {
     pub fn from_tss(tss: &TaskStateSegment) {
 
     }
+}
+
+#[test_case]
+fn test_default_segment_descriptor_null() {
+    let null = DefaultSegmentDescriptor::null();
+    assert_eq!(null.0, 0)
+}
+
+#[test_case]
+fn test_default_segment_descriptor_kernel_data() {
+    let kernel_data = DefaultSegmentDescriptor::kernel_data();
+    assert_eq!(kernel_data.0, 0x00_CF_92_00_0000_FFFF)
+}
+
+#[test_case]
+fn test_default_segment_descriptor_kernel_code() {
+    let kernel_code = DefaultSegmentDescriptor::kernel_code();
+    assert_eq!(kernel_code.0, 0x00_AF_9A_00_0000_FFFF)
+}
+
+#[test_case]
+fn test_default_segment_descriptor_user_data() {
+    let user_data: DefaultSegmentDescriptor = DefaultSegmentDescriptor::user_data();
+    assert_eq!(user_data.0, 0x00_CF_F2_00_0000_FFFF)
+}
+
+#[test_case]
+fn test_default_segment_descriptor_user_code() {
+    let user_code = DefaultSegmentDescriptor::user_code();
+    assert_eq!(user_code.0, 0x00_AF_FA_00_0000_FFFF)
 }
