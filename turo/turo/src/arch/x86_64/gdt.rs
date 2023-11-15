@@ -10,7 +10,7 @@ pub fn init() {}
 /// 
 /// It contains the size of the GDT and the offset of the GDT that it describes.
 #[repr(C, packed)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct GDTDescriptor {
     /// The size of the GDT is the actual size - 1, because the maximum value of a 16-bit number is 65536, but the max
     /// size of a GDT can be 65536 bytes.
@@ -21,7 +21,7 @@ pub struct GDTDescriptor {
 }
 
 impl GDTDescriptor {
-    pub fn new(table: GlobalDescriptorTable) -> Self {
+    pub fn new(table: &GlobalDescriptorTable) -> Self {
         Self {
             size: table.size - 1,
 
@@ -126,7 +126,11 @@ impl GlobalDescriptorTable {
     /// This function is unsafe because you must make sure that the underlying GDT pointed to by the GDTR is valid
     /// and you must make sure that the GDTR itself is valid.
     unsafe fn load_unsafe(&self, gdtr: &GDTDescriptor) {
-
+        asm!(
+            "lgdt [{}]",
+            in(reg) gdtr,
+            options(nostack, nomem)
+        );
     }
 }
 
@@ -380,6 +384,7 @@ impl SystemSegmentDescriptor {
     }
 }
 
+// TODO : test panic methods
 #[test_case]
 fn test_default_segment_descriptor_null() {
     let null = DefaultSegmentDescriptor::null();
@@ -408,4 +413,57 @@ fn test_default_segment_descriptor_user_data() {
 fn test_default_segment_descriptor_user_code() {
     let user_code = DefaultSegmentDescriptor::user_code();
     assert_eq!(user_code.0, 0x00_AF_FA_00_0000_FFFF)
+}
+
+#[test_case]
+fn test_gdt_new() {
+    let gdt = GlobalDescriptorTable::new();
+
+    // check that the null descriptor is there
+    assert_eq!(gdt.size, 8);
+    assert_eq!(gdt.table[0], 0);
+}
+
+#[test_case]
+fn test_gdt_non_system() {
+    let mut gdt = GlobalDescriptorTable::new();
+
+    // add 'basic' segments
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::kernel_code());
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::kernel_data());
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::user_code());
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::user_data());
+
+    // check to see that the gdt is well-formed
+    assert_eq!(gdt.table[0], 0);
+    assert_eq!(gdt.table[1], 0x00_AF_9A_00_0000_FFFF);
+    assert_eq!(gdt.table[2], 0x00_CF_92_00_0000_FFFF);
+    assert_eq!(gdt.table[3], 0x00_AF_FA_00_0000_FFFF);
+    assert_eq!(gdt.table[4], 0x00_CF_F2_00_0000_FFFF);
+}
+
+#[test_case]
+fn test_gdt_system() {
+
+}
+
+#[test_case]
+fn test_gdtr() {
+    // all we need to do is check that the gdtr is well formed
+    let mut gdt = GlobalDescriptorTable::new();
+
+    // add 'basic' segments
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::kernel_code());
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::kernel_data());
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::user_code());
+    gdt.add_default_descriptor(DefaultSegmentDescriptor::user_data());
+
+    // create new gdtr from gdt
+    let gdtr = GDTDescriptor::new(&gdt);
+
+    let size = gdtr.size;
+    assert_eq!(size, 39);
+
+    let offset = gdtr.offset;
+    assert_eq!(offset, &gdt.table as *const _ as u64);
 }
