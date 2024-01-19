@@ -35,6 +35,14 @@ all-hdd: $(IMAGE_NAME).hdd
 run: $(IMAGE_NAME).iso
 	qemu-system-x86_64 -serial stdio -M q35 -m 8G -smp 4 -cdrom $(IMAGE_NAME).iso -boot d
 
+.PHONY: debug
+debug: $(IMAGE_NAME).iso
+# open a new shell and run gdb in it with the given gdbinit path and symbol file
+	gnome-terminal -- gdb -q -iex "set confirm off" -iex "add-symbol-file ${KERNEL_SYMBOL_FILE} 0xffffffff80000000"
+
+# begin running qemu
+	qemu-system-x86_64 -s -S -serial stdio -M q35 -m 8G -smp 4 -cdrom $(IMAGE_NAME).iso -boot d
+
 .PHONY: run-uefi
 run-uefi: ovmf $(IMAGE_NAME).iso
 	qemu-system-x86_64 -serial stdio -M q35 -m 8G -smp 4 -bios ovmf/OVMF.fd -cdrom $(IMAGE_NAME).iso -boot d

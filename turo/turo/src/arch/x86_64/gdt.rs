@@ -1,3 +1,5 @@
-pub fn init() {
-    
+
+
+struct GlobalDescriptorTable {
+
 }
