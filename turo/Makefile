@@ -37,8 +37,11 @@ run: $(IMAGE_NAME).iso
 
 .PHONY: debug
 debug: $(IMAGE_NAME).iso
+# check that the kernel symbol file is set
+	test -n "$(KERNEL_SYMBOL_FILE)"
+
 # open a new shell and run gdb in it with the given gdbinit path and symbol file
-	gnome-terminal -- gdb -q -iex "set confirm off" -iex "add-symbol-file ${KERNEL_SYMBOL_FILE} 0xffffffff80000000"
+	gnome-terminal -- rust-gdb -q -iex "set confirm off" -iex "add-symbol-file ${KERNEL_SYMBOL_FILE} 0xffffffff80000000"
 
 # begin running qemu
 	qemu-system-x86_64 -s -S -serial stdio -M q35 -m 8G -smp 4 -cdrom $(IMAGE_NAME).iso -boot d

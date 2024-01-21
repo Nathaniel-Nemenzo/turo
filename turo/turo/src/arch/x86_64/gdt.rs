@@ -1,4 +1,9 @@
 use bitflags::bitflags;
+use lazy_static::lazy_static;
+use x86_64::{registers::segmentation::Segment, structures::idt::DescriptorTable};
+use core::mem::size_of;
+
+use super::tss::{TaskStateSegment, TSS};
 
 /// Define bits for access flag for SegmentDescriptor.
 bitflags! {
@@ -10,7 +15,7 @@ bitflags! {
     } 
 
     /// SegmentDescriptorFlags defines and implements all of the flags used in a SegmentDescriptor.
-    pub struct SegmentDescriptorFlags: u8 {
+    pub struct SegmentDescriptorAccessByte: u8 {
         const ACCESSED = 1 << 0;
 
         // Contains some duplicate flags for semantic correctness.
@@ -41,7 +46,6 @@ bitflags! {
     }
 }
 
-#[repr(C, packed)]
 #[derive(Debug, PartialEq)]
 /// The SegmentDescriptor is a data structure in a GDT or LDT that provides the processor with the size and location of a segment, as well as access control and status information (Intel Manual 3 3.4.5). 
 struct SegmentDescriptor {
@@ -71,11 +75,11 @@ impl SegmentDescriptor {
             base_low: 0,
             base_mid: 0,
             access_byte: {
-                SegmentDescriptorFlags::PRESENT.bits() | 
-                SegmentDescriptorFlags::DPL_0.bits() |
-                SegmentDescriptorFlags::CODE_DATA_SEGMENT.bits() |
-                SegmentDescriptorFlags::EXECUTABLE.bits() |
-                SegmentDescriptorFlags::CODE_SEGMENT_READABLE.bits()
+                SegmentDescriptorAccessByte::PRESENT.bits() | 
+                SegmentDescriptorAccessByte::DPL_0.bits() |
+                SegmentDescriptorAccessByte::CODE_DATA_SEGMENT.bits() |
+                SegmentDescriptorAccessByte::EXECUTABLE.bits() |
+                SegmentDescriptorAccessByte::CODE_SEGMENT_READABLE.bits()
             },
             limit_flags: {
                 (DescriptorFlags::PAGE_BLOCKS.bits() | 
@@ -91,10 +95,10 @@ impl SegmentDescriptor {
             base_low: 0,
             base_mid: 0,
             access_byte: {
-                SegmentDescriptorFlags::PRESENT.bits() | 
-                SegmentDescriptorFlags::DPL_0.bits() |
-                SegmentDescriptorFlags::CODE_DATA_SEGMENT.bits() |
-                SegmentDescriptorFlags::DATA_SEGMENT_WRITABLE.bits()
+                SegmentDescriptorAccessByte::PRESENT.bits() | 
+                SegmentDescriptorAccessByte::DPL_0.bits() |
+                SegmentDescriptorAccessByte::CODE_DATA_SEGMENT.bits() |
+                SegmentDescriptorAccessByte::DATA_SEGMENT_WRITABLE.bits()
             },
             limit_flags: {
                 (DescriptorFlags::PAGE_BLOCKS.bits() | 
@@ -110,11 +114,11 @@ impl SegmentDescriptor {
             base_low: 0,
             base_mid: 0,
             access_byte: {
-                SegmentDescriptorFlags::PRESENT.bits() | 
-                SegmentDescriptorFlags::DPL_3.bits() |
-                SegmentDescriptorFlags::CODE_DATA_SEGMENT.bits() |
-                SegmentDescriptorFlags::EXECUTABLE.bits() |
-                SegmentDescriptorFlags::CODE_SEGMENT_READABLE.bits()
+                SegmentDescriptorAccessByte::PRESENT.bits() | 
+                SegmentDescriptorAccessByte::DPL_3.bits() |
+                SegmentDescriptorAccessByte::CODE_DATA_SEGMENT.bits() |
+                SegmentDescriptorAccessByte::EXECUTABLE.bits() |
+                SegmentDescriptorAccessByte::CODE_SEGMENT_READABLE.bits()
             },
             limit_flags: {
                 (DescriptorFlags::PAGE_BLOCKS.bits() | 
@@ -130,10 +134,10 @@ impl SegmentDescriptor {
             base_low: 0,
             base_mid: 0,
             access_byte: {
-                SegmentDescriptorFlags::PRESENT.bits() | 
-                SegmentDescriptorFlags::DPL_3.bits() |
-                SegmentDescriptorFlags::CODE_DATA_SEGMENT.bits() |
-                SegmentDescriptorFlags::DATA_SEGMENT_WRITABLE.bits()
+                SegmentDescriptorAccessByte::PRESENT.bits() | 
+                SegmentDescriptorAccessByte::DPL_3.bits() |
+                SegmentDescriptorAccessByte::CODE_DATA_SEGMENT.bits() |
+                SegmentDescriptorAccessByte::DATA_SEGMENT_WRITABLE.bits()
             },
             limit_flags: {
                 (DescriptorFlags::PAGE_BLOCKS.bits() | 
@@ -144,7 +148,18 @@ impl SegmentDescriptor {
     }
 }
 
-#[repr(C, packed)]
+impl Into<u64> for SegmentDescriptor {
+    fn into(self) -> u64 {
+        let mut ret = (self.base_high as u64) << 56;
+        ret |= (self.limit_flags as u64) << 48; 
+        ret |= (self.access_byte as u64) << 40;
+        ret |= (self.base_mid as u64) << 32;
+        ret |= (self.base_low as u64) << 16;
+        ret |= self.limit_low as u64;
+        ret
+    }
+}
+
 #[derive(Debug, PartialEq)]
 /// The SystemSegmentDescriptor is a data structure in a GDT or LDT that fall into two categories: system-segment descriptors and gate descriptors. System-segment descriptors point to system segment (LDT and TSS). Gate descriptors are in themselves "gates," which hold pointers to procedure entry points in code segments or hold segments desciptors for TSS's (task gates) (Intel Manual 3 3.5).
 struct SystemSegmentDescriptor {
@@ -159,10 +174,56 @@ struct SystemSegmentDescriptor {
 }
 
 impl SystemSegmentDescriptor {
-    pub fn tss() -> Self {
-        todo!();
+    pub fn tss(tss: &TaskStateSegment) -> Self {
+        let tss_size = size_of::<TaskStateSegment>();
+        let tss_addr = tss as *const _ as u64;
+        Self {
+            limit_low: (0xFFFF & tss_size) as u16,
+            base_low: (0xFFFF & tss_addr) as u16,
+            base_mid_low: (0xFF & tss_addr >> 16) as u8,
+            access_byte: SegmentDescriptorAccessByte::PRESENT.bits() | SystemSegmentDescriptorAccessByte::TSS_64_AVAILABLE.bits(),
+            limit_flags: (0xF & tss_size >> 16) as u8,
+            base_mid_high: (0xFF & tss_addr >> 24) as u8,
+            base_high: (0xFFFFFFFF & tss_addr >> 32) as u32,
+
+            // hopefully doesn't cause any issues
+            _reserved: 0,
+        }
     }
 }
+
+impl Into<(u64, u64)> for SystemSegmentDescriptor {
+    fn into(self) -> (u64, u64) {
+        let mut ret = ((self.base_mid_high as u64) << 56, (self._reserved as u64) << 32);
+        
+        // lower half
+        ret.0 |= (self.limit_flags as u64) << 48; 
+        ret.0 |= (self.access_byte as u64) << 40;
+        ret.0 |= (self.base_mid_low as u64) << 32;
+        ret.0 |= (self.base_low as u64) << 16;
+        ret.0 |= self.limit_low as u64;
+
+        // upper half
+        ret.1 |= (self.base_high as u64);
+        ret
+    }
+}
+
+/// The GlobalDescriptorTable is a data structure specific to IA-32 and x86-64 architectures. It contains entries telling the CPU about memory segments. [https://wiki.osdev.org/Global_Descriptor_Table]. 
+lazy_static! {
+    static ref GDT: [u64; 7] = [
+        SegmentDescriptor::null_descriptor().into(),
+        SegmentDescriptor::kernel_mode_code_segment().into(),
+        SegmentDescriptor::kernel_mode_data_segment().into(),
+        SegmentDescriptor::user_mode_code_segment().into(),
+        SegmentDescriptor::user_mode_data_segment().into(),
+        <SystemSegmentDescriptor as core::convert::Into<(u64, u64)>>::into(SystemSegmentDescriptor::tss(&TSS)).0,
+        <SystemSegmentDescriptor as core::convert::Into<(u64, u64)>>::into(SystemSegmentDescriptor::tss(&TSS)).1,
+    ];
+}
+
+
+// unit tests ------------------------------------
 
 #[test_case]
 fn test_SegmentDescriptor_null_descriptor() {
@@ -245,6 +306,51 @@ fn test_SegmentDescriptor_user_mode_data_segment() {
 }
 
 #[test_case]
+fn test_SegmentDescriptor_into64() {
+    let descriptor = SegmentDescriptor {
+        limit_low: 0xABCD,
+        base_low: 0xABCD,
+        base_mid: 0xAB,
+        access_byte: 0xAB,
+        limit_flags: 0xAB,
+        base_high: 0xAB,
+    };
+
+    let expected: u64 = 0xABABABABABCDABCD;
+    let actual: u64 = descriptor.into();
+    assert_eq!(expected, actual)
+}
+
+#[test_case]
 fn test_SystemSegmentDescriptor_tss() {
-    todo!();
+    let tss = TaskStateSegment::null();
+    let tss_size = size_of::<TaskStateSegment>();
+    let tss_addr = &tss as *const _ as u64;
+    let expected = SystemSegmentDescriptor {
+        limit_low: 0xFFFF & tss_size as u16,
+        base_low: 0xFFFF & tss_addr as u16,
+        base_mid_low: 0xFF & (tss_addr >> 16) as u8,
+        access_byte: 0x89,
+        limit_flags: 0xF & (tss_size >> 16) as u8,
+        base_mid_high: 0xFF & (tss_addr >> 24) as u8,
+        base_high: 0xFFFFFFFF & (tss_addr >> 32) as u32,
+        _reserved: 0
+    };
+}
+
+#[test_case]
+fn test_SystemSegmentDescriptor_tss() {
+    let descriptor = SystemSegmentDescriptor {
+        limit_low: 0xABCD,
+        base_low: 0xABCD,
+        base_mid_low: 0xAB,
+        access_byte: 0xAB,
+        limit_flags: 0xAB,
+        base_mid_high: 0xAB,
+        base_high: 0xABCD,
+        _reserved: 0
+    };
+
+    let expected: (u64, u64) = (0xABABABABABCDABCD, 0xABCD);
+    let actual: (u64, u64) = descriptor.into();
 }
