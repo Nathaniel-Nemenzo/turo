@@ -1,6 +1,5 @@
 use bitflags::bitflags;
 use lazy_static::lazy_static;
-use x86_64::{registers::segmentation::Segment, structures::idt::DescriptorTable};
 use core::mem::size_of;
 
 use super::tss::{TaskStateSegment, TSS};
@@ -204,7 +203,7 @@ impl Into<(u64, u64)> for SystemSegmentDescriptor {
         ret.0 |= self.limit_low as u64;
 
         // upper half
-        ret.1 |= (self.base_high as u64);
+        ret.1 |= self.base_high as u64;
         ret
     }
 }
@@ -220,6 +219,137 @@ lazy_static! {
         <SystemSegmentDescriptor as core::convert::Into<(u64, u64)>>::into(SystemSegmentDescriptor::tss(&TSS)).0,
         <SystemSegmentDescriptor as core::convert::Into<(u64, u64)>>::into(SystemSegmentDescriptor::tss(&TSS)).1,
     ];
+}
+
+#[repr(C, packed(2))]
+/// The GDTR (Global Descriptor Table Register) contains the offset and the size of the GDT, as specified by this struct. The LGDT instruction takes a pointer to this structure as a parameter.
+struct GDTPointer {
+    size: u16,
+    offset: u64,
+}
+
+impl From<[u64; 7]> for GDTPointer {
+    fn from(value: [u64; 7]) -> Self {
+        Self {
+            size: (value.len() * size_of::<u64>()) as u16 - 1,
+            offset: &value as *const _ as u64
+        }
+    }
+}
+
+#[repr(C)]
+struct SegmentSelector {
+    pub bits: u16
+}
+
+impl SegmentSelector {
+    pub fn new(index: u16, rpl: u16) -> Self {
+        Self {
+            bits: (index << 3) | rpl
+        }
+    }
+}
+
+bitflags! {
+    pub struct GDTIndices: u16 {
+        const NULL = 0;
+        const KERNEL_CODE = 1;
+        const KERNEL_DATA = 2;
+        const USER_CODE = 3;
+        const USER_DATA = 4;
+        const TSS = 5;
+    }
+
+    pub struct RPL: u16 {
+        const RPL_0 = 0;
+        const RPL_1 = 1;
+        const RPL_2 = 2;
+        const RPL_3 = 3;
+    }
+}
+
+pub fn init() {
+    let pointer = GDTPointer::from(*GDT);
+
+    unsafe {
+        load_gdt(&pointer);
+        load_cs(SegmentSelector::new(GDTIndices::KERNEL_CODE.bits(), RPL::RPL_0.bits()));
+        load_ds(SegmentSelector::new(GDTIndices::KERNEL_DATA.bits(), RPL::RPL_0.bits()));
+        load_es(SegmentSelector::new(GDTIndices::KERNEL_DATA.bits(), RPL::RPL_0.bits()));
+        load_fs(SegmentSelector::new(GDTIndices::KERNEL_DATA.bits(), RPL::RPL_0.bits()));
+        load_gs(SegmentSelector::new(GDTIndices::KERNEL_DATA.bits(), RPL::RPL_0.bits()));
+        load_ss(SegmentSelector::new(GDTIndices::KERNEL_DATA.bits(), RPL::RPL_0.bits()));
+    }
+}
+
+unsafe fn load_gdt(pointer: &GDTPointer) {
+    asm!(
+        "lgdt [{}]", 
+        in(reg) pointer, 
+        options(nostack)
+    )
+}
+
+/// Copied from: https://github.com/Andy-Python-Programmer/aero/blob/master/src/aero_kernel/src/arch/x86_64/gdt.rs#L371
+/// Essentially, x86 will not allow you to move directly into the CS register. To get around this, we perform a far return. What we do is push the segment selector onto the stack and store the effective address of the function we're going to return to in a register (this function ideally should just continue on in the execution path). Then, we push the address to the stack and we far return. This will set the CS register (an effect of the 'retfq' instruction) and continue to the next instruction, which in this case is whatever is after '1:', which doesn't have any instruction, so it just returns.
+unsafe fn load_cs(selector: SegmentSelector) {
+    asm!(
+        "push {selector}",
+        "lea {tmp}, [1f + rip]",
+        "push {tmp}",
+        "retfq",
+        "1:",
+        selector = in(reg) u64::from(selector.bits),
+        tmp = lateout(reg) _,
+    )
+}
+
+unsafe fn load_ds(selector: SegmentSelector) {
+    asm!(
+        "mov ds, {0:x}", 
+        in(reg) selector.bits, 
+        options(nomem, nostack)
+    )
+}
+
+unsafe fn load_es(selector: SegmentSelector) {
+    asm!(
+        "mov es, {0:x}",
+        in(reg) selector.bits,
+        options(nomem, nostack)
+    )
+}
+
+unsafe fn load_fs(selector: SegmentSelector) {
+    asm!(
+        "mov fs, {0:x}",
+        in(reg) selector.bits,
+        options(nomem, nostack)
+    )
+}
+
+unsafe fn load_gs(selector: SegmentSelector) {
+    asm!(
+        "mov gs, {0:x}",
+        in(reg) selector.bits,
+        options(nomem, nostack)
+    )
+}
+
+unsafe fn load_ss(selector: SegmentSelector) {
+    asm!(
+        "mov ss, {0:x}",
+        in(reg) selector.bits,
+        options(nomem, nostack)
+    )
+}
+
+unsafe fn load_tss(selector: SegmentSelector) {
+    asm!(
+        "ltr {0:x}",
+        in(reg) selector.bits,
+        options(nomem, nostack)
+    )
 }
 
 
