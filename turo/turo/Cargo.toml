@@ -7,17 +7,14 @@ edition = "2021"
 
 [dependencies]
 spin = { version = "0.9.8", default-features = false, features = [
-    "spin_mutex",
-    "rwlock",
-    "once",
-] }
-limine = "0.1.11"
+    "spin_mutex"
+]}
+limine = "0.3.1"
 log = "0.4.20"
-bitflags = "2.4.1"
 uart_16550 = "0.3.0"
 
 [dependencies.x86_64]
-version = "0.14.11"
+version = "0.15.2"
 features = ["instructions"]
 
 [dependencies.lazy_static]
