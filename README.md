@@ -7,7 +7,7 @@
 
 ## 🚀 Overview
 
-`turo` is a general-purpose operating system written for the `x86-64` architecture. it follows the monolithic design pattern for operating systems.
+`turo` is a general-purpose operating system written for the `x86-64` architecture, althoughe eventually (not soon) it will support other architectures as well. it follows the monolithic design pattern for operating systems.
 
 ## 📸 Screenshots
 
